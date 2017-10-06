@@ -123,6 +123,9 @@ int main(int argc, char **argv) {
     string filename = argv[1];
     assert(utils::read_file(filename) == 0);
 
+    cout<<"N is: "<<utils::N<<endl;
+    cout<<"Mat is: "<<utils::mat[0]<<endl;
+    cout<<"Mat is: "<<utils::mat[5]<<endl;
     int *dist;
     bool has_negative_cycle;
 
