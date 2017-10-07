@@ -1,0 +1,15 @@
+1.文件夹里面已经有编译好的可执行文件，可以直接运行
+
+比如:$ mpiexec -n 4 ./mpi_bellman_ford input1.txt
+Time(s): 0.000152
+可以对比得到的output.txt文件与输出的output1.txt
+
+$ mpiexec -n 4 ./mpi_bellman_ford input2.txt                
+Time(s): 0.085509
+可以对比得到的output.txt文件与输出的output2.txt
+
+
+2.编译
+mpic++ -std=c++11 -o mpi_bellman_ford mpi_bellman_ford.cpp
+
+得到可执行的二进制文件mpi_bellman_ford，可以运行
