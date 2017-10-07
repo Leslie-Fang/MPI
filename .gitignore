@@ -13,3 +13,11 @@
 /*/*.png
 /*/*.local
 /*.o
+
+*
+!*.cpp
+!readme
+!*.txt
+!*.pdf
+!*.c
+!*.md
