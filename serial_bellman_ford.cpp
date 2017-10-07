@@ -96,6 +96,9 @@ void bellman_ford(int n, int *mat, int *dist, bool *has_negative_cycle) {
                 }
             }
         }
+//        for(int k=0;k<n;k++){
+//            cout<<"Round: "<<i<<"dist:"<<k<<"value:"<<dist[k]<<endl;
+//        }
         //if there is no change in this iteration, then we have finished
         if(!has_change) {
             return;
@@ -123,9 +126,9 @@ int main(int argc, char **argv) {
     string filename = argv[1];
     assert(utils::read_file(filename) == 0);
 
-    cout<<"N is: "<<utils::N<<endl;
-    cout<<"Mat is: "<<utils::mat[0]<<endl;
-    cout<<"Mat is: "<<utils::mat[5]<<endl;
+//    cout<<"N is: "<<utils::N<<endl;
+//    cout<<"Mat is: "<<utils::mat[0]<<endl;
+//    cout<<"Mat is: "<<utils::mat[5]<<endl;
     int *dist;
     bool has_negative_cycle;
 

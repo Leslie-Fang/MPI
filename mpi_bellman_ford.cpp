@@ -25,6 +25,7 @@ using std::endl;
 
 #define INF 1000000
 
+MPI_Status state;
 /**
  * utils is a namespace for utility functions
  * including I/O (read input file and print results) and matrix dimension convert(2D->1D) function
@@ -77,7 +78,9 @@ namespace utils {
 }//namespace utils
 
 // you may add some helper functions here.
+void mybroad(int my_rank, int p, void* data, void* revdata,int count, MPI_Datatype datatype, MPI_Comm comm){
 
+}
 /**
  * Bellman-Ford algorithm. Find the shortest path from vertex 0 to other vertices.
  * @param my_rank the rank of current process
@@ -90,21 +93,163 @@ namespace utils {
 */
 void bellman_ford(int my_rank, int p, MPI_Comm comm, int n, int *mat, int *dist, bool *has_negative_cycle) {
     //------your code starts from here------
-
     //step 1: broadcast N
+    *has_negative_cycle = false;
+
+    //init the dist in rank0
+    if(my_rank == 0){
+        for (int i = 0; i < n; i++) {
+            dist[i] = INF;
+        }
+        dist[0] = 0;
+    }
+    MPI_Barrier(comm);
+
+    //broadcast the n: number of verticals
+    if(my_rank == 0){
+        for(int j=1;j<p;j++){
+            MPI_Send(&n, 1, MPI_INT, j, 0, comm);
+        }
+    }else{
+        MPI_Recv(&n, 1, MPI_INT, 0, 0, comm, &state);
+    }
+    MPI_Barrier(comm);
+
+    //broadcast the dist
+    int *localdist;
+    localdist = (int *) malloc(sizeof(int) * n);
+    if(my_rank == 0){
+        for(int j=1;j<p;j++){
+            MPI_Send(dist, n, MPI_INT, j, 0, comm);
+        }
+        //In the rank 0, just copy it
+        localdist = dist;
+    }else{
+        MPI_Recv(localdist, n, MPI_INT, 0, 0, comm, &state);
+    }
+    MPI_Barrier(comm);
+
+    //a flag to record if there is any distance change in this iteration
+    bool has_change = false;
 
     //step 2: find local task range
-    
+    int localEdges = n*n/p;//localEdges is the number of edges would be calculated in each process
+
     //step 3: allocate local memory
-    
+    int *localmat;
+    localmat = (int *) malloc(n * n * sizeof(int));
+
     //step 4: broadcast matrix mat
+    if(my_rank == 0){
+        for(int j=1;j<p;j++){
+            MPI_Send(mat, n * n, MPI_INT, j, 0, comm);
+        }
+        //In the rank 0, just copy it
+        localmat = mat;
+    }else{
+        MPI_Recv(localmat, n*n, MPI_INT, 0, 0, comm, &state);
+    }
+    MPI_Barrier(comm);
 
     //step 5: bellman-ford algorithm
-   
+    //bellman-ford edge relaxation
+    int localStartEdge = localEdges*my_rank;
+    for (int i = 0; i < n - 1; i++){// n - 1 iteration
+        has_change = false;
+        for(int m=localStartEdge;m<localStartEdge+localEdges;m++) {
+            int weight = localmat[m];
+            if (weight < INF) {//test if u--v has an edge
+                int u = m / n;
+                int v = m % n;
+                if (localdist[u] + weight < localdist[v]) {
+                    has_change = true;
+                    localdist[v] = localdist[u] + weight;
+                }
+            }
+        }
+        MPI_Barrier(comm);
+//      broadcast has_change to the root
+        if(my_rank != 0){
+            MPI_Send(&has_change, 1, MPI_BYTE, 0, 0, comm);
+        }else{
+            bool localhas_change = false;
+            for(int j=1;j<p;j++){
+                MPI_Recv(&localhas_change, 1, MPI_BYTE, j, 0, comm, &state);
+                has_change = localhas_change | has_change;
+            }
+        }
+        MPI_Barrier(comm);
+        if(my_rank == 0){
+            for(int k = 1; k < p; k++){
+                MPI_Send(&has_change, 1, MPI_BYTE, k, 0, comm);
+            }
+        }else{
+            MPI_Recv(&has_change, 1, MPI_BYTE, 0, 0, comm, &state);
+        }
+        MPI_Barrier(comm);
+        //if there is no change in this iteration, then we have finished
+        if(has_change) {
+            if(my_rank != 0){
+                MPI_Send(localdist, n, MPI_INT, 0, 0, comm);
+            }else{
+                int *tmpdist;
+                tmpdist = (int *) malloc(sizeof(int) * n);
+                for(int j=1;j<p;j++){
+                    MPI_Recv(tmpdist, n, MPI_INT, j, 0, comm, &state);
+                    for(int k=0;k<n;k++){
+                        if(tmpdist[k] < localdist[k]){
+                            localdist[k] = tmpdist[k];
+                        }
+                    }
+                }
+            }
+            MPI_Barrier(comm);
+            if(my_rank == 0){
+                for(int j=1;j<p;j++){
+                    MPI_Send(localdist, n, MPI_INT, j, 0, comm);
+                }
+            }else{
+                MPI_Recv(localdist, n, MPI_INT, 0, 0, comm, &state);
+            }
+            MPI_Barrier(comm);
+        }else{
+            break;
+        }
+    }
+
+    //last run to judge
+    for(int m=localStartEdge;m<localStartEdge+localEdges;m++) {
+        int weight = localmat[m];
+        if (weight < INF) {//test if u--v has an edge
+            int u = m / n;
+            int v = m % n;
+            if (localdist[u] + weight < localdist[v]) {
+                *has_negative_cycle = true;
+            }
+        }
+    }
+    if(my_rank != 0){
+        MPI_Send(has_negative_cycle, 1, MPI_BYTE, 0, 0, comm);
+    }else{
+        bool localhas_negative_cycle = false;
+        for(int j=1;j<p;j++){
+            MPI_Recv(&localhas_negative_cycle, 1, MPI_BYTE, j, 0, comm, &state);
+            *has_negative_cycle = localhas_negative_cycle | *has_negative_cycle;
+        }
+    }
+
     //step 6: retrieve results back
-    
+//    if(my_rank == 0){
+//        for(int k=0;k<n;k++){
+//            dist[k] = localdist[k];
+//        }
+//    }
     //step 7: remember to free memory
-   
+   if(my_rank != 0){
+       free(localdist);
+       free(localmat);
+   }
+    return;
     //------end of your code------
 }
 
@@ -116,7 +261,6 @@ int main(int argc, char **argv) {
 
     int *dist;
     bool has_negative_cycle = false;
-
     //MPI initialization
     MPI_Init(&argc, &argv);
     MPI_Comm comm;
@@ -133,18 +277,16 @@ int main(int argc, char **argv) {
         dist = (int *) malloc(sizeof(int) * utils::N);
     }
 
+    MPI_Barrier(comm);//waiting until all the processes implemented to this statement
     //time counter
     double t1, t2;
-    MPI_Barrier(comm);
     t1 = MPI_Wtime();
 
-    //bellman-ford algorithm
+//    bellman-ford algorithm
     bellman_ford(my_rank, p, comm, utils::N, utils::mat, dist, &has_negative_cycle);
     MPI_Barrier(comm);
-
-    //end timer
+//    //end timer
     t2 = MPI_Wtime();
-
     if (my_rank == 0) {
         std::cerr.setf(std::ios::fixed);
         std::cerr << std::setprecision(6) << "Time(s): " << (t2 - t1) << endl;

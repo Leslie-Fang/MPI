@@ -33,7 +33,7 @@ int main(){
         local_area +=(f(local_start+i*step)+f(local_start+(i+1)*step))*step/2;
     }
     cout<<"I am rank:"<<comm_rank<<". My local area is:"<<local_area<<endl;
-
+    MPI_Barrier(MPI_COMM_WORLD);
     if(comm_rank != 0){
         MPI_Send(&local_area, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
     }else{
